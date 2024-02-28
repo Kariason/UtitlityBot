@@ -9,15 +9,33 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Microsoft.Extensions.Hosting;
+using UtitlityBot.Controllers;
+
+
 namespace UtitlityBot
 {
     class Bot : BackgroundService
     {
         private ITelegramBotClient _telegramClient;
 
-        public Bot(ITelegramBotClient telegramClient)
+        // Контроллеры различных видов сообщений
+        private InlineKeyboardController _inlineKeyboardController;
+        private MessageLengthController _MessageLengthController;
+        private SumOfNumbersController _SumOfNumbersController;
+        private DefaultMessageController _defaultMessageController;
+
+        public Bot(
+            ITelegramBotClient telegramClient,
+            InlineKeyboardController inlineKeyboardController,
+            MessageLengthController MessageLengthController,
+            SumOfNumbersController SumOfNumbersController,
+            DefaultMessageController defaultMessageController)
         {
             _telegramClient = telegramClient;
+            _inlineKeyboardController = inlineKeyboardController;
+            _MessageLengthController = MessageLengthController;
+            _SumOfNumbersController = SumOfNumbersController;
+            _defaultMessageController = defaultMessageController;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -36,23 +54,24 @@ namespace UtitlityBot
             //  Обрабатываем нажатия на кнопки  из Telegram Bot API: https://core.telegram.org/bots/api#callbackquery
             if (update.Type == UpdateType.CallbackQuery)
             {
-                await _telegramClient.SendTextMessageAsync(update.CallbackQuery.From.Id, $"Данный тип сообщений не поддерживается. Пожалуйста отправьте текст.", cancellationToken: cancellationToken);
+                await _inlineKeyboardController.Handle(update.CallbackQuery, cancellationToken);
                 return;
             }
 
-            // Обрабатываем входящие сообщения из Telegram Bot API: https://core.telegram.org/bots/api#message
             if (update.Type == UpdateType.Message)
             {
                 switch (update.Message!.Type)
                 {
+                    
                     case MessageType.Text:
-                        await _telegramClient.SendTextMessageAsync(update.Message.From.Id, $"Длина сообщения: {update.Message.Text.Length} знаков", cancellationToken: cancellationToken);
+                        await _MessageLengthController.Handle(update.Message, cancellationToken);
                         return;
-                    default: // unsupported message
-                        await _telegramClient.SendTextMessageAsync(update.Message.From.Id, $"Данный тип сообщений не поддерживается. Пожалуйста отправьте текст.", cancellationToken: cancellationToken);
+                    default:
+                        await _defaultMessageController.Handle(update.Message, cancellationToken);
                         return;
                 }
             }
+
         }
 
         Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
